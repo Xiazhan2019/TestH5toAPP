@@ -1,83 +1,84 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>测试App拉起</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拉起App示例</title>
 </head>
 <body>
-    <h1>测试从浏览器拉起App</h1>
-    
-    <p><a href="myapp://open/product?id=123">打开App商品详情</a></p>
-    <p><a href="myapp://open/cart">打开App购物车</a></p>
-    <p><a href="https://www.baidu.com/" onclick="launchApp()">通过App Link打开</a></p>
-    
-    <script>
-        // JavaScript方式尝试唤起App
-//        function launchApp() {
-//            const appUrl = "myapp://open/product?id=789";
-//            const fallbackUrl = "https://sj.qq.com/appdetail/com.dahuatech.lechangeyi";
-//
-//            // 记录点击时间
-//            const startTime = Date.now();
-//
-//            // 尝试唤起App
-//            window.location.href = appUrl;
-//
-//            // 如果3秒后仍未跳走，则打开应用商店
-//            setTimeout(() => {
-//            if (Date.now() - startTime < 2000) {
-//                window.location.href = fallbackUrl;
-//            }
-//            }, 1500);
-//        }
 
-		
-		function launchApp() {
-    // 平台检测
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    <p><a href="installerproduct://routeapi.lechange.com/product">打开App商品详情</a></p>
+    <p><a href="https://partner-test-hz2.imou.com/installerproduct">通过App Link打开</a></p>
+	
+	
+    <button onclick="launchApp()">打开安装工APP</button>
+
+    <script>
+        function launchApp() {
+            // 1. 平台检测（区分Android/iOS）
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     
-    // 定义不同平台的URL Scheme
-    const androidUrl = "installerproduct://routeapi.lechange.com/product";
-    const iosUrl = "installerproduct://routeapi.lechange.com/products"; // 假设iOS使用不同的格式
-    
-    // 应用商店下载链接
-    const androidFallback = "https://sj.qq.com/appdetail/com.dahuatech.lechangeyi";
-    const iOSFallback = "https://apps.apple.com/cn/app/%E4%B9%90%E6%A9%99%E5%AE%89%E8%A3%85%E5%AE%9D/id1624640444";
-    
-    // 根据平台选择URL
-    const appUrl = isAndroid ? androidUrl : iosUrl;
-    const fallbackUrl = isAndroid ? androidFallback : iOSFallback;
-    
-    // 记录点击时间
-    const startTime = Date.now();
-    
-    // 尝试唤起App
-    window.location.href = appUrl;
-    
-    // iOS需要特殊处理WKWebView的情况
-    if (isiOS) {
-        // 针对WKWebView的iframe方案
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = appUrl;
-        document.body.appendChild(iframe);
-        
-        setTimeout(() => {
-            document.body.removeChild(iframe);
-        }, 2000);
-    }
-    
-    // 时间检测逻辑
-    setTimeout(() => {
-        // 检查页面是否隐藏或时间差过小
-        if (Date.now() - startTime < 2500 && !document.hidden) {
-            window.location.href = fallbackUrl;
+            const userAgent = navigator.userAgent.toLowerCase();
+            const isWeChat = userAgent.includes('micromessenger'); // 检测是否在微信环境
+
+            // 2. 配置URL Scheme（App的唤起协议，需与App端约定）
+            // Android的URL Scheme（示例：安装工的scheme为"installerproduct"）
+            const androidScheme = "installerproduct://routeapi.lechange.com/product"; 
+            // iOS的URL Scheme（格式与Android一致，需App端同步配置）
+            const iosScheme = "installerproduct://product"; 
+
+            // 3. 配置备选链接（未安装App时跳转的下载页/落地页）
+            const fallbackUrl = isiOS 
+                ? "https://apps.apple.com/cn/app/id1624640444" // iOS App Store
+                : "https://sj.qq.com/appdetail/com.dahuatech.lechangeyi"; // Android应用市场
+
+            // 4. 微信环境特殊处理（微信屏蔽scheme，直接提示跳转浏览器）
+            if (isWeChat) {
+                alert("请点击右上角「...」，选择在浏览器中打开以唤起App");
+                return;
+            }
+
+            // 5. 尝试唤起App
+            let launchSuccess = false;
+            const startTime = Date.now();
+
+            // 监听页面可见性变化（判断是否成功唤起App）
+            const handleVisibilityChange = () => {
+                if (document.visibilityState === 'hidden') {
+                    // 页面隐藏，说明App可能被唤起
+                    launchSuccess = true;
+                }
+            };
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            // 执行唤起逻辑
+            if (isiOS) {
+                // iOS使用iframe唤起（部分浏览器对window.location.href支持不好）
+                //const iframe = document.createElement('iframe');
+                //iframe.style.display = 'none';
+                //iframe.src = iosScheme;
+                //document.body.appendChild(iframe);
+                // 3秒后移除iframe，避免内存占用
+                //setTimeout(() => document.body.removeChild(iframe), 3000);
+				window.location.href = iosScheme;
+            } else if (isAndroid) {
+                // Android直接通过location.href唤起
+                window.location.href = androidScheme;
+            }
+
+            // 6. 检测唤起结果（3秒后判断是否成功）
+            setTimeout(() => {
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+                const elapsedTime = Date.now() - startTime;
+
+                // 未成功唤起（页面未隐藏，且时间超过2秒）
+                if (!launchSuccess && elapsedTime > 2000) {
+                    // 跳转到备选链接
+                    window.location.href = fallbackUrl;
+                }
+            }, 3000);
         }
-    }, 2000);
-}
     </script>
-    
-    <button onclick="launchApp()">JavaScript方式唤起App</button>
 </body>
-</html>    
+</html>
